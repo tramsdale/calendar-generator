@@ -43,6 +43,16 @@ def get_google_calendar_service():
 
     return build('calendar', 'v3', credentials=creds)
 
+def list_calendars(service):
+    """List available calendars and their IDs."""
+    calendars = service.calendarList().list().execute()
+    print("\nAvailable calendars:")
+    print("-" * 50)
+    for calendar in calendars['items']:
+        print(f"Calendar ID: {calendar['id']}")
+        print(f"Name: {calendar['summary']}")
+        print("-" * 50)
+
 def create_calendar_event(
     service,
     title: str,
@@ -50,7 +60,8 @@ def create_calendar_event(
     timezone: str = "UTC",
     start_time: str = "00:00",
     end_time: str = "23:59",
-    attendees: Optional[List[str]] = None
+    attendees: Optional[List[str]] = None,
+    calendar_id: str = "primary"
 ):
     """Create a calendar event with the given parameters."""
     # Parse the date and times
@@ -77,10 +88,10 @@ def create_calendar_event(
     if attendees:
         event['attendees'] = [{'email': email.strip()} for email in attendees]
 
-    event = service.events().insert(calendarId='primary', body=event).execute()
+    event = service.events().insert(calendarId=calendar_id, body=event).execute()
     return event
 
-def process_sheet(sheet_path: str, default_timezone: str = "UTC"):
+def process_sheet(sheet_path: str, default_timezone: str = "UTC", calendar_id: str = "primary"):
     """Process events from a CSV file."""
     try:
         df = pd.read_csv(sheet_path)
@@ -104,7 +115,8 @@ def process_sheet(sheet_path: str, default_timezone: str = "UTC"):
                 date=row['Date'],
                 timezone=timezone,
                 start_time="00:00",
-                end_time="23:59"
+                end_time="23:59",
+                calendar_id=calendar_id
             )
             events_created += 1
 
@@ -117,6 +129,12 @@ def create_single_event(args):
     """Handle creation of a single calendar event."""
     try:
         service = get_google_calendar_service()
+        
+        # If requested, list available calendars
+        if args.list_calendars:
+            list_calendars(service)
+            return
+
         attendee_list = args.attendees.split(',') if args.attendees else None
         event = create_calendar_event(
             service=service,
@@ -125,7 +143,8 @@ def create_single_event(args):
             start_time=args.start_time,
             end_time=args.end_time,
             timezone=args.timezone,
-            attendees=attendee_list
+            attendees=attendee_list,
+            calendar_id=args.calendar_id
         )
         print(f"Event created successfully! Event ID: {event['id']}")
     except Exception as e:
@@ -134,7 +153,14 @@ def create_single_event(args):
 def create_from_sheet(args):
     """Handle creation of events from a CSV file."""
     try:
-        events_created = process_sheet(args.file, args.timezone)
+        service = get_google_calendar_service()
+        
+        # If requested, list available calendars
+        if args.list_calendars:
+            list_calendars(service)
+            return
+
+        events_created = process_sheet(args.file, args.timezone, args.calendar_id)
         print(f"Successfully created {events_created} events!")
     except Exception as e:
         print(f"Error: {str(e)}")
@@ -151,10 +177,26 @@ Examples:
 
   Create events from CSV:
     %(prog)s from-sheet events.csv --timezone "UTC"
+
+  List available calendars:
+    %(prog)s create --list-calendars
+    %(prog)s from-sheet --list-calendars
         """
     )
     subparsers = parser.add_subparsers(dest='command', help='Commands')
     subparsers.required = True
+
+    # Common arguments for both commands
+    calendar_args = {
+        '--calendar-id': {
+            'default': "primary",
+            'help': 'Calendar ID to create events in. Use --list-calendars to see available calendars.'
+        },
+        '--list-calendars': {
+            'action': 'store_true',
+            'help': 'List available calendars and their IDs'
+        }
+    }
 
     # Parser for the 'create' command
     create_parser = subparsers.add_parser('create', help='Create a single calendar event')
@@ -187,6 +229,8 @@ Examples:
         '--attendees',
         help='Comma-separated list of attendee email addresses'
     )
+    for arg, kwargs in calendar_args.items():
+        create_parser.add_argument(arg, **kwargs)
     create_parser.set_defaults(func=create_single_event)
 
     # Parser for the 'from-sheet' command
@@ -210,6 +254,8 @@ Create multiple calendar events from a CSV file. The CSV must contain these colu
         default="UTC",
         help='Default timezone for events missing timezone. Defaults to UTC'
     )
+    for arg, kwargs in calendar_args.items():
+        sheet_parser.add_argument(arg, **kwargs)
     sheet_parser.set_defaults(func=create_from_sheet)
 
     # Parse arguments and call the appropriate function

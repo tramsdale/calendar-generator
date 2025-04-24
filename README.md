@@ -37,13 +37,25 @@ To see help for a specific command:
 ./calgen.py from-sheet --help
 ```
 
+### Listing Available Calendars
+
+To see all calendars you have access to:
+```bash
+./calgen.py create --list-calendars
+# or
+./calgen.py from-sheet --list-calendars
+```
+
+This will display each calendar's ID and name. You can use these IDs with the `--calendar-id` option.
+
 ### Creating a Single Event
 
 ```bash
 ./calgen.py create \
   --title "Team Meeting" \
   --date "2024-03-20" \
-  --timezone "America/New_York"
+  --timezone "America/New_York" \
+  --calendar-id "your.email@example.com"
 ```
 
 Arguments:
@@ -53,6 +65,8 @@ Arguments:
 - `--start-time`: (Optional) Start time in HH:MM format (24-hour). Defaults to 00:00
 - `--end-time`: (Optional) End time in HH:MM format (24-hour). Defaults to 23:59
 - `--attendees`: (Optional) Comma-separated list of attendee email addresses
+- `--calendar-id`: (Optional) Calendar ID to create events in. Defaults to primary calendar
+- `--list-calendars`: (Optional) List available calendars and their IDs
 
 ### Creating Multiple Events from a CSV File
 
@@ -71,10 +85,14 @@ UK,Project Review,2024-03-21,Europe/London
 
 Then run:
 ```bash
-./calgen.py from-sheet events.csv --timezone "UTC"
+./calgen.py from-sheet events.csv --timezone "UTC" --calendar-id "your.email@example.com"
 ```
 
-The `--timezone` argument is used as a fallback if the Timezone column is missing or empty for any row.
+Arguments:
+- First argument: Path to the CSV file (Required)
+- `--timezone`: (Optional) Default timezone for events missing timezone. Defaults to UTC
+- `--calendar-id`: (Optional) Calendar ID to create events in. Defaults to primary calendar
+- `--list-calendars`: (Optional) List available calendars and their IDs
 
 ## Timezones
 
