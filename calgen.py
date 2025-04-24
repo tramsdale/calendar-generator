@@ -91,7 +91,7 @@ def create_calendar_event(
     event = service.events().insert(calendarId=calendar_id, body=event).execute()
     return event
 
-def process_sheet(sheet_path: str, default_timezone: str = "UTC", calendar_id: str = "primary"):
+def process_sheet(sheet_path: str, default_timezone: str = "UTC", calendar_id: str = "primary", override_attendees: Optional[List[str]] = None, override_timezone: Optional[str] = None):
     """Process events from a CSV file."""
     try:
         df = pd.read_csv(sheet_path)
@@ -106,8 +106,15 @@ def process_sheet(sheet_path: str, default_timezone: str = "UTC", calendar_id: s
         events_created = 0
 
         for _, row in df.iterrows():
-            # Use row's timezone if available, otherwise use default
-            timezone = row.get('Timezone', default_timezone).strip()
+            # Use override timezone if provided, otherwise use row's timezone or default
+            timezone = override_timezone or row.get('Timezone', default_timezone).strip()
+            
+            # Use override attendees if provided, otherwise use row's attendees if present
+            attendees = None
+            if override_attendees is not None:
+                attendees = override_attendees
+            elif 'Attendees' in row and pd.notna(row['Attendees']):
+                attendees = [email.strip() for email in row['Attendees'].split(',')]
             
             create_calendar_event(
                 service=service,
@@ -116,9 +123,13 @@ def process_sheet(sheet_path: str, default_timezone: str = "UTC", calendar_id: s
                 timezone=timezone,
                 start_time="00:00",
                 end_time="23:59",
+                attendees=attendees,
                 calendar_id=calendar_id
             )
             events_created += 1
+            print(f"Created event: {row['Title']} on {row['Date']} ({timezone})")
+            if attendees:
+                print(f"  Attendees: {', '.join(attendees)}")
 
         return events_created
     except Exception as e:
@@ -147,6 +158,8 @@ def create_single_event(args):
             calendar_id=args.calendar_id
         )
         print(f"Event created successfully! Event ID: {event['id']}")
+        if attendee_list:
+            print(f"Attendees: {', '.join(attendee_list)}")
     except Exception as e:
         print(f"Error creating event: {str(e)}")
 
@@ -160,8 +173,20 @@ def create_from_sheet(args):
             list_calendars(service)
             return
 
-        events_created = process_sheet(args.file, args.timezone, args.calendar_id)
-        print(f"Successfully created {events_created} events!")
+        # Process override attendees if provided
+        override_attendees = args.attendees.split(',') if args.attendees else None
+        
+        # Process override timezone
+        override_timezone = args.override_timezone
+
+        events_created = process_sheet(
+            args.file,
+            args.timezone,
+            args.calendar_id,
+            override_attendees,
+            override_timezone
+        )
+        print(f"\nSuccessfully created {events_created} events!")
     except Exception as e:
         print(f"Error: {str(e)}")
 
@@ -177,6 +202,7 @@ Examples:
 
   Create events from CSV:
     %(prog)s from-sheet events.csv --timezone "UTC"
+    %(prog)s from-sheet events.csv --override-timezone "America/New_York" --attendees "person1@example.com,person2@example.com"
 
   List available calendars:
     %(prog)s create --list-calendars
@@ -243,6 +269,9 @@ Create multiple calendar events from a CSV file. The CSV must contain these colu
 - Title (required): Event title
 - Date (required): Event date in YYYY-MM-DD format
 - Timezone (required): Timezone for the event
+- Attendees (optional): Comma-separated list of attendee email addresses
+
+Command-line options --override-timezone and --attendees will override values from the CSV.
         """
     )
     sheet_parser.add_argument(
@@ -253,6 +282,14 @@ Create multiple calendar events from a CSV file. The CSV must contain these colu
         '--timezone',
         default="UTC",
         help='Default timezone for events missing timezone. Defaults to UTC'
+    )
+    sheet_parser.add_argument(
+        '--override-timezone',
+        help='Override timezone for all events, ignoring values from the CSV'
+    )
+    sheet_parser.add_argument(
+        '--attendees',
+        help='Override attendees for all events with this comma-separated list'
     )
     for arg, kwargs in calendar_args.items():
         sheet_parser.add_argument(arg, **kwargs)

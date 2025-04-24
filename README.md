@@ -75,24 +75,38 @@ Create a CSV file with the following columns:
 - `Title`: (Required) Event title
 - `Date`: (Required) Event date in YYYY-MM-DD format
 - `Timezone`: (Required) Timezone for the event
+- `Attendees`: (Optional) Comma-separated list of attendee email addresses
 
 Example CSV format:
 ```csv
-Country,Title,Date,Timezone
-USA,Team Meeting,2024-03-20,America/New_York
-UK,Project Review,2024-03-21,Europe/London
+Country,Title,Date,Timezone,Attendees
+USA,Team Meeting,2024-03-20,America/New_York,person1@example.com,person2@example.com
+UK,Project Review,2024-03-21,Europe/London,person3@example.com
+Japan,Board Meeting,2024-03-22,Asia/Tokyo,
 ```
 
-Then run:
+Basic usage:
 ```bash
 ./calgen.py from-sheet events.csv --timezone "UTC" --calendar-id "your.email@example.com"
+```
+
+Override timezone and attendees for all events:
+```bash
+./calgen.py from-sheet events.csv \
+  --override-timezone "America/New_York" \
+  --attendees "person1@example.com,person2@example.com" \
+  --calendar-id "your.email@example.com"
 ```
 
 Arguments:
 - First argument: Path to the CSV file (Required)
 - `--timezone`: (Optional) Default timezone for events missing timezone. Defaults to UTC
+- `--override-timezone`: (Optional) Override timezone for all events, ignoring values from the CSV
+- `--attendees`: (Optional) Override attendees for all events, ignoring values from the CSV
 - `--calendar-id`: (Optional) Calendar ID to create events in. Defaults to primary calendar
 - `--list-calendars`: (Optional) List available calendars and their IDs
+
+Note: When using `--override-timezone` or `--attendees`, the corresponding values in the CSV file will be ignored.
 
 ## Timezones
 
