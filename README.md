@@ -41,46 +41,40 @@ To see help for a specific command:
 
 ```bash
 ./calgen.py create \
-  --summary "Meeting with Team" \
+  --title "Team Meeting" \
   --date "2024-03-20" \
-  --start-time "09:00" \
-  --end-time "10:00" \
-  --timezone "America/New_York" \
-  --attendees "person1@example.com,person2@example.com"
+  --timezone "America/New_York"
 ```
 
 Arguments:
-- `--summary`: (Required) Event title/summary
+- `--title`: (Required) Event title
 - `--date`: (Required) Event date in YYYY-MM-DD format
+- `--timezone`: (Optional) Timezone name. Defaults to UTC
 - `--start-time`: (Optional) Start time in HH:MM format (24-hour). Defaults to 00:00
 - `--end-time`: (Optional) End time in HH:MM format (24-hour). Defaults to 23:59
-- `--timezone`: (Optional) Timezone name. Defaults to UTC
 - `--attendees`: (Optional) Comma-separated list of attendee email addresses
 
 ### Creating Multiple Events from a CSV File
 
 Create a CSV file with the following columns:
-- `summary` (required): Event title
-- `date` (required): Event date in YYYY-MM-DD format
-- `start_time` (optional): Start time in HH:MM format
-- `end_time` (optional): End time in HH:MM format
-- `attendees` (optional): Comma-separated list of attendee emails
+- `Country`: (Optional) Country name - this column will be ignored
+- `Title`: (Required) Event title
+- `Date`: (Required) Event date in YYYY-MM-DD format
+- `Timezone`: (Required) Timezone for the event
 
 Example CSV format:
 ```csv
-summary,date,start_time,end_time,attendees
-Team Meeting,2024-03-20,09:00,10:00,person1@example.com,person2@example.com
-Project Review,2024-03-21,14:00,15:30,person3@example.com
+Country,Title,Date,Timezone
+USA,Team Meeting,2024-03-20,America/New_York
+UK,Project Review,2024-03-21,Europe/London
 ```
 
 Then run:
 ```bash
-./calgen.py from-sheet events.csv --timezone "America/New_York"
+./calgen.py from-sheet events.csv --timezone "UTC"
 ```
 
-Arguments:
-- First argument: Path to the CSV file (Required)
-- `--timezone`: (Optional) Default timezone for all events. Defaults to UTC
+The `--timezone` argument is used as a fallback if the Timezone column is missing or empty for any row.
 
 ## Timezones
 

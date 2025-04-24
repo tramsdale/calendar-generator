@@ -1,4 +1,4 @@
-# Credentials and tokens
+# Google Calendar API credentials
 credentials.json
 token.json
 
@@ -6,8 +6,8 @@ token.json
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -27,8 +27,8 @@ wheels/
 # Virtual Environment
 venv/
 ENV/
-env/
 .env/
+.venv/
 
 # IDE
 .idea/
@@ -36,7 +36,7 @@ env/
 *.swp
 *.swo
 
-# OS
+# OS generated files
 .DS_Store
 .DS_Store?
 ._*

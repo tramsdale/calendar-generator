@@ -45,11 +45,11 @@ def get_google_calendar_service():
 
 def create_calendar_event(
     service,
-    summary: str,
+    title: str,
     date: str,
+    timezone: str = "UTC",
     start_time: str = "00:00",
     end_time: str = "23:59",
-    timezone: str = "UTC",
     attendees: Optional[List[str]] = None
 ):
     """Create a calendar event with the given parameters."""
@@ -63,7 +63,7 @@ def create_calendar_event(
     end_dt = tz.localize(end_dt)
 
     event = {
-        'summary': summary,
+        'summary': title,
         'start': {
             'dateTime': start_dt.isoformat(),
             'timeZone': timezone,
@@ -80,32 +80,31 @@ def create_calendar_event(
     event = service.events().insert(calendarId='primary', body=event).execute()
     return event
 
-def process_sheet(sheet_path: str, timezone: str = "UTC"):
+def process_sheet(sheet_path: str, default_timezone: str = "UTC"):
     """Process events from a CSV file."""
     try:
         df = pd.read_csv(sheet_path)
-        required_columns = {'summary', 'date'}
+        required_columns = {'Title', 'Date', 'Timezone'}
         if not required_columns.issubset(df.columns):
-            raise ValueError(f"Sheet must contain the following columns: {required_columns}")
+            raise ValueError(
+                f"Sheet must contain the following columns: {required_columns}. "
+                f"Found columns: {list(df.columns)}"
+            )
 
         service = get_google_calendar_service()
         events_created = 0
 
         for _, row in df.iterrows():
-            attendees = (
-                row['attendees'].split(',')
-                if 'attendees' in row and pd.notna(row['attendees'])
-                else None
-            )
+            # Use row's timezone if available, otherwise use default
+            timezone = row.get('Timezone', default_timezone).strip()
             
             create_calendar_event(
                 service=service,
-                summary=row['summary'],
-                date=row['date'],
-                start_time=row.get('start_time', "00:00"),
-                end_time=row.get('end_time', "23:59"),
+                title=row['Title'],
+                date=row['Date'],
                 timezone=timezone,
-                attendees=attendees
+                start_time="00:00",
+                end_time="23:59"
             )
             events_created += 1
 
@@ -121,7 +120,7 @@ def create_single_event(args):
         attendee_list = args.attendees.split(',') if args.attendees else None
         event = create_calendar_event(
             service=service,
-            summary=args.summary,
+            title=args.title,
             date=args.date,
             start_time=args.start_time,
             end_time=args.end_time,
@@ -148,10 +147,10 @@ def main():
         epilog="""
 Examples:
   Create a single event:
-    %(prog)s create --summary "Team Meeting" --date "2024-03-20" --start-time "09:00" --end-time "10:00" --timezone "America/New_York" --attendees "person1@example.com,person2@example.com"
+    %(prog)s create --title "Team Meeting" --date "2024-03-20" --timezone "America/New_York"
 
   Create events from CSV:
-    %(prog)s from-sheet events.csv --timezone "America/New_York"
+    %(prog)s from-sheet events.csv --timezone "UTC"
         """
     )
     subparsers = parser.add_subparsers(dest='command', help='Commands')
@@ -160,14 +159,19 @@ Examples:
     # Parser for the 'create' command
     create_parser = subparsers.add_parser('create', help='Create a single calendar event')
     create_parser.add_argument(
-        '--summary',
+        '--title',
         required=True,
-        help='Event summary/title'
+        help='Event title'
     )
     create_parser.add_argument(
         '--date',
         required=True,
         help='Event date in YYYY-MM-DD format'
+    )
+    create_parser.add_argument(
+        '--timezone',
+        default="UTC",
+        help='Timezone (e.g., "America/New_York", "Europe/London"). Defaults to UTC'
     )
     create_parser.add_argument(
         '--start-time',
@@ -178,11 +182,6 @@ Examples:
         '--end-time',
         default="23:59",
         help='End time in HH:MM format (24-hour). Defaults to 23:59'
-    )
-    create_parser.add_argument(
-        '--timezone',
-        default="UTC",
-        help='Timezone (e.g., "America/New_York", "Europe/London"). Defaults to UTC'
     )
     create_parser.add_argument(
         '--attendees',
@@ -196,11 +195,10 @@ Examples:
         help='Create events from a CSV file',
         description="""
 Create multiple calendar events from a CSV file. The CSV must contain these columns:
-- summary (required): Event title
-- date (required): Event date in YYYY-MM-DD format
-- start_time (optional): Start time in HH:MM format
-- end_time (optional): End time in HH:MM format
-- attendees (optional): Comma-separated list of attendee emails
+- Country (optional): Country name (will be ignored)
+- Title (required): Event title
+- Date (required): Event date in YYYY-MM-DD format
+- Timezone (required): Timezone for the event
         """
     )
     sheet_parser.add_argument(
@@ -210,7 +208,7 @@ Create multiple calendar events from a CSV file. The CSV must contain these colu
     sheet_parser.add_argument(
         '--timezone',
         default="UTC",
-        help='Default timezone for all events. Defaults to UTC'
+        help='Default timezone for events missing timezone. Defaults to UTC'
     )
     sheet_parser.set_defaults(func=create_from_sheet)
 
